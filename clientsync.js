@@ -1,4 +1,4 @@
-const BEAT_SAVER_URL = 'https://beatsaver.com/beatmap/93fe';
+const BEAT_SAVER_URL = 'https://beatsaver.com/beatmap/';
 const CUSTOM_LEVEL_DIR = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Beat Saber\\Beat Saber_Data\\CustomLevels';
 const CLIENT_NAME = 'Wendelin';
 
@@ -17,5 +17,21 @@ fs.readdir(CUSTOM_LEVEL_DIR, (err, files) => {
             }
         });
 
-    console.log(validBeatmaps[0]);
+    const firebaseAdmin = require("firebase-admin");
+    const serviceAccount = require("./service-account-key");
+
+    firebaseAdmin.initializeApp({
+        credential: firebaseAdmin.credential.cert(serviceAccount),
+        databaseURL: "https://beatmap-cloud-store.firebaseio.com"
+    });
+
+    firebaseAdmin
+        .firestore()
+        .collection('beatmaps')
+        .get()
+        .then(snapshot => {
+            const documents = [];
+            snapshot.forEach(doc => documents.push(doc.data()));
+        })
+        .catch(console.error);
 });
