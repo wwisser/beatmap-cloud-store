@@ -5,6 +5,6 @@ console.log(`Found ${localBeatmaps.length} local beatmaps...`);
 
 impl.sync(
     localBeatmaps,
-    () => console.log('Upload sync done.'),
-    bsrIds => console.log(`Download sync done with ${bsrIds.length} beatmaps.`)
+    beatmaps => console.log(`Uploaded ${beatmaps.length} new beatmaps into cloud store.`),
+    bsrIds => console.log(`Downloaded ${bsrIds.length} new beatmaps to local directory.`)
 );

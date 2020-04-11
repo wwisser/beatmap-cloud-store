@@ -27,7 +27,7 @@ function getLocalBeatmaps() {
         });
 }
 
-function sync(beatmaps, onUploaded, onDownloaded) {
+function sync(localBeatmaps, onUploaded, onDownloaded) {
     firebaseAdmin.initializeApp({
         credential: firebaseAdmin.credential.cert(serviceAccount),
         databaseURL: "https://beatmap-cloud-store.firebaseio.com"
@@ -36,11 +36,26 @@ function sync(beatmaps, onUploaded, onDownloaded) {
     const firestore = firebaseAdmin.firestore();
     const beatmapsCollection = firestore.collection('beatmaps');
 
-    updateStore(beatmaps);
+    beatmapsCollection
+        .get()
+        .then(snapshot => {
+            const documents = [];
+            snapshot.forEach(doc => documents.push(doc.data()));
+            const existingBsrIds = documents.map(beatmap => beatmap.bsrId);
 
-    //syncLocal();
+            const newCloudBsrIds = existingBsrIds.filter(bsrId => !localBeatmaps.some(localBeatmap => localBeatmap.bsrId === bsrId));
+            const newLocalBeatmaps = localBeatmaps.filter(beatmap => !existingBsrIds.includes(beatmap.bsrId));
 
-    function updateStore(beatmaps) {
+            if (newLocalBeatmaps.length > 0) {
+                uploadBeatmaps(newLocalBeatmaps);
+            }
+            if (newCloudBsrIds.length >  0) {
+                downloadBeatmaps(newCloudBsrIds);
+            }
+        })
+        .catch(console.error);
+
+    function uploadBeatmaps(beatmaps) {
         const BATCH_SIZE = 499;
         const batches = [firestore.batch()];
         let operations = 0;
@@ -60,21 +75,12 @@ function sync(beatmaps, onUploaded, onDownloaded) {
 
         Promise
             .all(batches.map(batch => batch.commit()))
-            .then(onUploaded);
+            .then(() => onUploaded(beatmaps));
     }
 
-    function syncLocal() {
-        beatmapsCollection
-            .get()
-            .then(snapshot => {
-                const documents = [];
-                snapshot.forEach(doc => documents.push(doc.data()));
-
-                const bsrIds = documents.map(beatmap => beatmap.bsrId);
-                // TODO download via beatsaver API
-                onDownloaded(bsrIds);
-            })
-            .catch(console.error);
+    function downloadBeatmaps(beatmaps) {
+        // TODO download newCloudBsrIds via API
+        onDownloaded(beatmaps);
     }
 }
 
