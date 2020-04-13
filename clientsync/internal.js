@@ -1,4 +1,5 @@
 const fs = require('fs');
+const fetch = require('node-fetch');
 const firebaseAdmin = require("firebase-admin");
 const serviceAccount = require("../service-account-key");
 const DirectorySeparator = require('./directory-separator');
@@ -27,7 +28,7 @@ function getLocalBeatmaps() {
         });
 }
 
-function sync(localBeatmaps, onUploaded, onDownloaded) {
+function sync(localBeatmaps, onUploaded, onDownload) {
     firebaseAdmin.initializeApp({
         credential: firebaseAdmin.credential.cert(serviceAccount),
         databaseURL: "https://beatmap-cloud-store.firebaseio.com"
@@ -47,10 +48,12 @@ function sync(localBeatmaps, onUploaded, onDownloaded) {
             const newLocalBeatmaps = localBeatmaps.filter(beatmap => !existingBsrIds.includes(beatmap.bsrId));
 
             if (newLocalBeatmaps.length > 0) {
-                uploadBeatmaps(newLocalBeatmaps);
+                uploadBeatmaps(newLocalBeatmaps)
+                    .then(() => onUploaded(newLocalBeatmaps));
             }
-            if (newCloudBsrIds.length >  0) {
-                downloadBeatmaps(newCloudBsrIds);
+            if (newCloudBsrIds.length > 0) {
+                downloadBeatmaps(newCloudBsrIds)
+                    .then(() => onDownloaded(newCloudBsrIds));
             }
         })
         .catch(console.error);
@@ -73,14 +76,23 @@ function sync(localBeatmaps, onUploaded, onDownloaded) {
             }
         });
 
-        Promise
-            .all(batches.map(batch => batch.commit()))
-            .then(() => onUploaded(beatmaps));
+        return Promise
+            .all(batches.map(batch => batch.commit()));
     }
 
-    function downloadBeatmaps(beatmaps) {
-        // TODO download newCloudBsrIds via API
-        onDownloaded(beatmaps);
+    function downloadBeatmaps(bsrIds) {
+        let result = Promise.resolve();
+
+        bsrIds.forEach(bsrId => {
+            const dest = fs.createWriteStream(`${bsrId}.zip`);
+
+            result = result.then(
+                () => fetch("https://beatsaver.com/api/download/key/88d5")
+                    .then(res => res.body.pipe(dest))
+            );
+        });
+
+        return result;
     }
 }
 
