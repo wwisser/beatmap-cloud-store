@@ -53,7 +53,7 @@ function sync(localBeatmaps, onUploaded, onDownload) {
             }
             if (newCloudBsrIds.length > 0) {
                 downloadBeatmaps(newCloudBsrIds)
-                    .then(() => onDownloaded(newCloudBsrIds));
+                    .then(() => onDownload(newCloudBsrIds));
             }
         })
         .catch(console.error);
