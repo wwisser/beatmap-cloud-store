@@ -1,10 +1,12 @@
 const fs = require('fs');
+const fetch = require('node-fetch');
+const unzipper = require('unzipper');
 const firebaseAdmin = require("firebase-admin");
 const serviceAccount = require("../service-account-key");
 const DirectorySeparator = require('./directory-separator');
 
 const DIR_SEPARATOR = DirectorySeparator.WINDOWS;
-const BEAT_SAVER_URL = 'https://beatsaver.com/beatmap/';
+const BEAT_SAVER_URL = 'https://beatsaver.com/api';
 const CUSTOM_LEVEL_DIR = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Beat Saber\\Beat Saber_Data\\CustomLevels';
 const CLIENT_NAME = 'Wendelin';
 
@@ -27,7 +29,7 @@ function getLocalBeatmaps() {
         });
 }
 
-function sync(localBeatmaps, onUploaded, onDownloaded) {
+function sync(localBeatmaps, onUploaded, onDownload) {
     firebaseAdmin.initializeApp({
         credential: firebaseAdmin.credential.cert(serviceAccount),
         databaseURL: "https://beatmap-cloud-store.firebaseio.com"
@@ -47,10 +49,12 @@ function sync(localBeatmaps, onUploaded, onDownloaded) {
             const newLocalBeatmaps = localBeatmaps.filter(beatmap => !existingBsrIds.includes(beatmap.bsrId));
 
             if (newLocalBeatmaps.length > 0) {
-                uploadBeatmaps(newLocalBeatmaps);
+                uploadBeatmaps(newLocalBeatmaps)
+                    .then(() => onUploaded(newLocalBeatmaps));
             }
-            if (newCloudBsrIds.length >  0) {
-                downloadBeatmaps(newCloudBsrIds);
+            if (newCloudBsrIds.length > 0) {
+                downloadBeatmaps(newCloudBsrIds)
+                    .then(() => onDownload(newCloudBsrIds));
             }
         })
         .catch(console.error);
@@ -73,14 +77,31 @@ function sync(localBeatmaps, onUploaded, onDownloaded) {
             }
         });
 
-        Promise
-            .all(batches.map(batch => batch.commit()))
-            .then(() => onUploaded(beatmaps));
+        return Promise
+            .all(batches.map(batch => batch.commit()));
     }
 
-    function downloadBeatmaps(beatmaps) {
-        // TODO download newCloudBsrIds via API
-        onDownloaded(beatmaps);
+    function downloadBeatmaps(bsrIds) {
+        let result = Promise.resolve();
+
+        bsrIds.forEach(bsrId => {
+            result = result
+                .then(
+                    () => fetch(`${BEAT_SAVER_URL}/download/key/${bsrId}`)
+                        .then(res => {
+                            const extractor = unzipper.Extract({path: bsrId});
+                            res.body.pipe(extractor);
+
+                            extractor.on('close', () => {
+                                const info = JSON.parse(fs.readFileSync(bsrId + DIR_SEPARATOR + 'info.dat', 'utf-8'));
+                                const dirName = `${bsrId} (${info._songName} - ${info._levelAuthorName})`;
+                                fs.renameSync(bsrId, CUSTOM_LEVEL_DIR + DIR_SEPARATOR + dirName);
+                            });
+                        })
+                )
+        });
+
+        return result;
     }
 }
 
