@@ -97,7 +97,12 @@ function downloadBeatmaps(bsrIds) {
                         extractor.on('close', () => {
                             const info = JSON.parse(fs.readFileSync(bsrId + DIR_SEPARATOR + 'info.dat', 'utf-8'));
                             const dirName = `${bsrId} (${info._songName} - ${info._levelAuthorName})`;
-                            fs.renameSync(bsrId, CUSTOM_LEVEL_DIR + DIR_SEPARATOR + dirName);
+
+                            try {
+                                fs.renameSync(bsrId, CUSTOM_LEVEL_DIR + DIR_SEPARATOR + dirName);
+                            } catch (e) {
+                                console.error(e)
+                            }
                         });
                     })
             )
