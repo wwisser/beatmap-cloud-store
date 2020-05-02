@@ -1,11 +1,12 @@
 const fs = require('fs');
 const fetch = require('node-fetch');
+const unzipper = require('unzipper');
 const firebaseAdmin = require("firebase-admin");
 const serviceAccount = require("../service-account-key");
 const DirectorySeparator = require('./directory-separator');
 
 const DIR_SEPARATOR = DirectorySeparator.WINDOWS;
-const BEAT_SAVER_URL = 'https://beatsaver.com/beatmap/';
+const BEAT_SAVER_URL = 'https://beatsaver.com/api';
 const CUSTOM_LEVEL_DIR = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Beat Saber\\Beat Saber_Data\\CustomLevels';
 const CLIENT_NAME = 'Wendelin';
 
@@ -84,12 +85,20 @@ function sync(localBeatmaps, onUploaded, onDownload) {
         let result = Promise.resolve();
 
         bsrIds.forEach(bsrId => {
-            const dest = fs.createWriteStream(`${bsrId}.zip`);
+            result = result
+                .then(
+                    () => fetch(`${BEAT_SAVER_URL}/download/key/${bsrId}`)
+                        .then(res => {
+                            const extractor = unzipper.Extract({path: bsrId});
+                            res.body.pipe(extractor);
 
-            result = result.then(
-                () => fetch("https://beatsaver.com/api/download/key/88d5")
-                    .then(res => res.body.pipe(dest))
-            );
+                            extractor.on('close', () => {
+                                const info = JSON.parse(fs.readFileSync(bsrId + DIR_SEPARATOR + 'info.dat', 'utf-8'));
+                                const dirName = `${bsrId} (${info._songName} - ${info._levelAuthorName})`;
+                                fs.renameSync(bsrId, CUSTOM_LEVEL_DIR + DIR_SEPARATOR + dirName);
+                            });
+                        })
+                )
         });
 
         return result;
