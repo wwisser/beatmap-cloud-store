@@ -94,9 +94,11 @@ function downloadBeatmaps(bsrIds) {
                         const extractor = unzipper.Extract({path: bsrId});
                         res.body.pipe(extractor);
 
+                        extractor.on('error', console.error);
                         extractor.on('close', () => {
                             const info = JSON.parse(fs.readFileSync(bsrId + DIR_SEPARATOR + 'info.dat', 'utf-8'));
-                            const dirName = `${bsrId} (${info._songName} - ${info._levelAuthorName})`;
+                            const dirName = `${bsrId} (${info._songName} - ${info._levelAuthorName})`
+                                .replace(new RegExp('[:<>"\/|\?*]'), '');
 
                             try {
                                 fs.renameSync(bsrId, CUSTOM_LEVEL_DIR + DIR_SEPARATOR + dirName);
